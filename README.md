@@ -49,11 +49,20 @@ that live in the cap2UI5 framework:
 
 ## Build
 
-The **build web** workflow runs weekly (Sundays 03:00 UTC) and on demand
-(`workflow_dispatch`): it mirrors the upstream repo, builds the site,
-uploads it as the `cap2ui5-web` artifact and deploys it to GitHub Pages
+The **build web** workflow runs on every push to `main`, weekly (Sundays
+03:00 UTC, safety net) and on demand (`workflow_dispatch`): it mirrors the
+upstream repo, builds the site, uploads it as the `cap2ui5-web` artifact
+and deploys it to GitHub Pages
 (repo settings → Pages → Source **"GitHub Actions"**; the workflow enables
 this automatically on first run where the token is allowed to).
+
+Upstream changes arrive event-driven: after every update, the
+`7_trigger_web` step of the sync pipeline in
+[cap2UI5](https://github.com/cap2UI5/cap2UI5) writes the upstream sha to
+`UPSTREAM_HEAD` and pushes it here via a deploy key registered on this
+repository with write access (private half: secret `ACTION_KEY_WEB` in
+cap2UI5) — that push starts this workflow. So the site follows every
+cap2UI5 change instead of waiting for the weekly cron.
 
 Locally:
 
