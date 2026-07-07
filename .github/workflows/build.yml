@@ -1,11 +1,19 @@
 name: build web
 
-# Weekly (and on-demand) rebuild of the static cap2UI5 browser site:
-# mirror the upstream cap2UI5 repo, bundle backend + samples + frontend,
-# deploy the result to GitHub Pages. The build is also uploaded as the
-# workflow artifact `cap2ui5-web`.
+# Rebuild of the static cap2UI5 browser site: mirror the upstream cap2UI5
+# repo, bundle backend + samples + frontend, deploy the result to GitHub
+# Pages. The build is also uploaded as the workflow artifact `cap2ui5-web`.
+#
+# Runs event-driven on every push to main. That includes the trigger
+# commits cap2UI5's sync pipeline pushes here via deploy key (its
+# 7_trigger_web workflow updates UPSTREAM_HEAD after each upstream
+# change), so the site follows every cap2UI5 update — plus changes to the
+# build tooling itself. The weekly cron remains as a safety net. No loop:
+# this workflow never pushes to the repo.
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: "0 3 * * 0" # Sundays 03:00 UTC — weekly safety net
   workflow_dispatch:
