@@ -1,0 +1,59 @@
+name: build web
+
+# Weekly (and on-demand) rebuild of the static cap2UI5 browser site:
+# mirror the upstream cap2UI5 repo, bundle backend + samples + frontend,
+# deploy the result to GitHub Pages. The build is also uploaded as the
+# workflow artifact `cap2ui5-web`.
+
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sundays 03:00 UTC — weekly safety net
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run mirror
+      - run: npm run build
+      - name: report upstream revision
+        run: echo "built from cap2UI5/cap2UI5@$(cat input/cap2UI5/UPSTREAM_COMMIT)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cap2ui5-web
+          path: dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # First run on a repo without Pages: create/enable the Pages site
+      # (source "GitHub Actions") so deploy-pages doesn't 404. If this step
+      # fails due to org/token policy, enable Pages once by hand:
+      # Settings → Pages → Source: "GitHub Actions".
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - id: deployment
+        uses: actions/deploy-pages@v4

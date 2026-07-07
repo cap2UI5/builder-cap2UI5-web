@@ -1,0 +1,17 @@
+{
+  "name": "web-cap2ui5",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser build of cap2UI5 — mirrors the upstream repo, bundles the CAP-free backend + samples + frontend into a static site and deploys it to GitHub Pages",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "mirror": "node mirror.mjs",
+    "registry": "node gen-registry.mjs",
+    "build": "node build.mjs",
+    "serve": "node dev-server.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
