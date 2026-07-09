@@ -1,8 +1,9 @@
 name: build web
 
 # Rebuild of the static cap2UI5 browser site: mirror the upstream cap2UI5
-# repo, bundle backend + samples + frontend, deploy the result to GitHub
-# Pages. The build is also uploaded as the workflow artifact `cap2ui5-web`.
+# repo, bundle backend + samples + frontend, and publish the result to the
+# dedicated build repo cap2UI5/web-cap2UI5-built. The build is also uploaded
+# as the workflow artifact `cap2ui5-web`.
 #
 # Runs event-driven on every push to main. That includes the trigger
 # commits cap2UI5's sync pipeline pushes here via deploy key (its
@@ -10,11 +11,15 @@ name: build web
 # change), so the site follows every cap2UI5 update — plus changes to the
 # build tooling itself. The weekly cron remains as a safety net.
 #
-# Before deploying, the built site is committed to the `site-history`
-# branch — one commit per deployment, so `git log`/`git diff` on that
-# branch shows exactly what changed between two deployments. No loop:
-# the workflow pushes only to site-history, and the push trigger above
-# is restricted to main.
+# The built site is pushed to the `main` branch of cap2UI5/web-cap2UI5-built
+# — one commit per deployment, so `git log`/`git diff` on that repo shows
+# exactly what changed between two deployments. GitHub Pages of that repo
+# serves the site (Settings → Pages → Deploy from a branch → main / root).
+# This repo holds only the tooling.
+#
+# Cross-repo push uses an SSH deploy key: the public half is registered on
+# web-cap2UI5-built with write access, the private half is the secret
+# BUILT_DEPLOY_KEY here.
 
 on:
   push:
@@ -27,14 +32,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: deploy-built
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # push the built site to the site-history branch
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -45,68 +48,52 @@ jobs:
       - run: npm run build
       - name: report upstream revision
         run: echo "built from cap2UI5/cap2UI5@$(cat input/cap2UI5/UPSTREAM_COMMIT)" >> "$GITHUB_STEP_SUMMARY"
-      # Snapshot the exact files that are about to be deployed onto the
-      # site-history branch — one commit per deployment. The branch never
-      # triggers this workflow (push trigger is main-only), so no loop.
+      # Publish the exact files that make up the site to the main branch of
+      # cap2UI5/web-cap2UI5-built — one commit per deployment. GitHub Pages
+      # of that repo serves this branch, so pushing here IS the deploy.
       # Identical rebuilds (e.g. the weekly cron with no upstream change)
-      # produce no commit. The `pages` concurrency group serializes runs,
-      # so pushes to site-history cannot race each other.
-      - name: record deployment in site-history branch
+      # produce no commit. The `deploy-built` concurrency group serializes
+      # runs, so pushes cannot race each other.
+      - name: publish built site to web-cap2UI5-built
         if: github.ref == 'refs/heads/main'
+        env:
+          BUILT_DEPLOY_KEY: ${{ secrets.BUILT_DEPLOY_KEY }}
         run: |
           set -euo pipefail
           UPSTREAM=$(cat input/cap2UI5/UPSTREAM_COMMIT)
-          HISTORY="$RUNNER_TEMP/site-history"
+          BUILT="$RUNNER_TEMP/web-cap2UI5-built"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # SSH deploy key with write access to the built repo
+          mkdir -p ~/.ssh
+          echo "$BUILT_DEPLOY_KEY" > ~/.ssh/built_key
+          chmod 600 ~/.ssh/built_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/built_key -o IdentitiesOnly=yes"
 
-          if git fetch origin site-history; then
-            git worktree add -B site-history "$HISTORY" FETCH_HEAD
-          else
-            # first run: start the branch with no parent history
-            git worktree add --detach "$HISTORY"
-            git -C "$HISTORY" checkout --orphan site-history
-            git -C "$HISTORY" rm -rfq . 2>/dev/null || true
-          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          find "$HISTORY" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -a dist/. "$HISTORY"/
-          cd "$HISTORY"
+          git clone --depth 1 --branch main \
+            git@github.com:cap2UI5/web-cap2UI5-built.git "$BUILT"
+
+          # Replace the tracked site with the freshly built one, keep .git.
+          # .nojekyll stops GitHub Pages from Jekyll-processing the bundle.
+          find "$BUILT" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a dist/. "$BUILT"/
+          touch "$BUILT/.nojekyll"
+
+          cd "$BUILT"
           git add -A
-          if git rev-parse -q --verify HEAD >/dev/null && git diff --cached --quiet; then
-            echo "site unchanged — no history commit" >> "$GITHUB_STEP_SUMMARY"
+          if git diff --cached --quiet; then
+            echo "site unchanged — no deploy commit" >> "$GITHUB_STEP_SUMMARY"
           else
             git commit -m "deploy: built from cap2UI5/cap2UI5@${UPSTREAM}" \
               -m "tooling: ${GITHUB_SHA}" \
               -m "run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            git push -u origin site-history
-            echo "deployment recorded on site-history: $(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
+            git push origin HEAD:main
+            echo "deployed to cap2UI5/web-cap2UI5-built@main: $(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v4
         with:
           name: cap2ui5-web
           path: dist
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      # First run on a repo without Pages: create/enable the Pages site
-      # (source "GitHub Actions") so deploy-pages doesn't 404. If this step
-      # fails due to org/token policy, enable Pages once by hand:
-      # Settings → Pages → Source: "GitHub Actions".
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - id: deployment
-        uses: actions/deploy-pages@v4
