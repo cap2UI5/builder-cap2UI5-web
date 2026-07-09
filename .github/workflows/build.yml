@@ -13,9 +13,10 @@ name: build web
 #
 # The built site is pushed to the `main` branch of cap2UI5/web-cap2UI5-built
 # — one commit per deployment, so `git log`/`git diff` on that repo shows
-# exactly what changed between two deployments. GitHub Pages of that repo
-# serves the site (Settings → Pages → Deploy from a branch → main / root).
-# This repo holds only the tooling.
+# exactly what changed between two deployments. That push triggers the
+# `deploy pages` workflow in web-cap2UI5-built, which deploys the pushed
+# site to GitHub Pages via GitHub Actions (Settings → Pages → Source →
+# GitHub Actions). This repo holds only the tooling.
 #
 # Cross-repo push uses an SSH deploy key: the public half is registered on
 # web-cap2UI5-built with write access, the private half is the secret
@@ -49,8 +50,9 @@ jobs:
       - name: report upstream revision
         run: echo "built from cap2UI5/cap2UI5@$(cat input/cap2UI5/UPSTREAM_COMMIT)" >> "$GITHUB_STEP_SUMMARY"
       # Publish the exact files that make up the site to the main branch of
-      # cap2UI5/web-cap2UI5-built — one commit per deployment. GitHub Pages
-      # of that repo serves this branch, so pushing here IS the deploy.
+      # cap2UI5/web-cap2UI5-built — one commit per deployment. That push
+      # triggers the `deploy pages` workflow there, which deploys the site
+      # to GitHub Pages via GitHub Actions, so pushing here IS the deploy.
       # Identical rebuilds (e.g. the weekly cron with no upstream change)
       # produce no commit. The `deploy-built` concurrency group serializes
       # runs, so pushes cannot race each other.
@@ -76,9 +78,11 @@ jobs:
           git clone --depth 1 --branch main \
             git@github.com:cap2UI5/web-cap2UI5-built.git "$BUILT"
 
-          # Replace the tracked site with the freshly built one, keep .git.
+          # Replace the tracked site with the freshly built one, keeping
+          # .git and .github (the built repo's own `deploy pages` workflow
+          # lives there and must survive each deployment).
           # .nojekyll stops GitHub Pages from Jekyll-processing the bundle.
-          find "$BUILT" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          find "$BUILT" -mindepth 1 -maxdepth 1 ! -name .git ! -name .github -exec rm -rf {} +
           cp -a dist/. "$BUILT"/
           touch "$BUILT/.nojekyll"
 

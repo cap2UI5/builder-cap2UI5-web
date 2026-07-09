@@ -57,9 +57,10 @@ and publishes it to the dedicated build repo
 
 The site is pushed to the `main` branch of `web-cap2UI5-built` — one commit
 per deployment, carrying the upstream sha, the tooling sha and a link to the
-workflow run. GitHub Pages of that repo serves the branch directly (Settings
-→ Pages → **Deploy from a branch** → `main` / root), so pushing there *is*
-the deploy. That repo's history is the audit trail of what was actually
+workflow run. That push triggers the `deploy pages` workflow in
+`web-cap2UI5-built`, which deploys the pushed site to GitHub Pages via
+GitHub Actions (Settings → Pages → **Source** → **GitHub Actions**), so
+pushing there *is* the deploy. That repo's history is the audit trail of what was actually
 deployed: `git log` lists every deployment, `git diff <old>..<new>` shows
 exactly which files changed between two of them. Identical rebuilds (e.g.
 the weekly cron without upstream changes) add no commit. `web-cap2UI5-built`
