@@ -173,4 +173,28 @@ fs.writeFileSync(indexFile, injected);
 // GitHub Pages: serve folders starting with _ etc. as-is.
 fs.writeFileSync(path.join(DIST, ".nojekyll"), "");
 
+// ---- 5. sanity-gate the shell ----------------------------------------------
+// A broken bootstrap ships silently as a blank page (UI5 never loads), so
+// assert the invariants the static shell needs before we call the build good:
+//   - the in-browser backend bundle is injected and present on disk
+//   - UI5 boots from an OpenUI5 CDN over https — never the proprietary SAPUI5
+//     one (ui5.sap.com / *.hana.ondemand.com/sapui5), never a relative path
+//     (no server serves /resources on GitHub Pages)
+{
+  const finalHtml = fs.readFileSync(indexFile, "utf8");
+  const problems = [];
+  if (!finalHtml.includes(`src="./${BUNDLE_NAME}"`)) problems.push(`bundle <script src="./${BUNDLE_NAME}"> missing`);
+  if (!fs.existsSync(path.join(DIST, BUNDLE_NAME))) problems.push(`${BUNDLE_NAME} not emitted`);
+  const boot = finalHtml.match(/id="sap-ui-bootstrap"[^>]*\ssrc="([^"]+)"/) || finalHtml.match(/<script[^>]*\ssrc="([^"]*sap-ui-core\.js)"/);
+  const bootSrc = boot?.[1] || "";
+  if (!bootSrc) problems.push("UI5 bootstrap <script src> not found");
+  else if (!/^https:\/\//.test(bootSrc)) problems.push(`UI5 bootstrap is not an absolute https URL: ${bootSrc}`);
+  else if (/ui5\.sap\.com|sapui5/i.test(bootSrc)) problems.push(`UI5 bootstrap uses the proprietary SAPUI5 distribution (OpenUI5 only): ${bootSrc}`);
+  else if (!/openui5/i.test(bootSrc)) problems.push(`UI5 bootstrap is not a recognized OpenUI5 CDN: ${bootSrc}`);
+  if (problems.length) {
+    throw new Error(`web build: shell sanity check failed —\n  - ${problems.join("\n  - ")}`);
+  }
+  console.log(`web build: shell OK — UI5 from ${bootSrc}`);
+}
+
 console.log(`web build complete → ${path.relative(process.cwd(), DIST)}`);
