@@ -47,6 +47,10 @@ jobs:
       - run: npm ci
       - run: npm run mirror
       - run: npm run build
+      # browser smoke against dist/ — a blank page (broken bootstrap, CDN
+      # 404, bundle not injected) must never reach the deploy step
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke
       - name: report upstream revision
         run: echo "built from cap2UI5/cap2UI5@$(cat input/cap2UI5/UPSTREAM_COMMIT)" >> "$GITHUB_STEP_SUMMARY"
       # Publish the exact files that make up the site to the main branch of

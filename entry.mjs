@@ -19,9 +19,12 @@
 // the UI5 bootstrap, so the interceptor is guaranteed to be in place when
 // the component fires its initial roundtrip.
 
-import z2ui5_cl_util from "./input/cap2UI5/core/srv/z2ui5/00/03/z2ui5_cl_util.js";
-import z2ui5_cl_core_srv_draft from "./input/cap2UI5/core/srv/z2ui5/01/01/z2ui5_cl_core_srv_draft.js";
-import z2ui5_cl_http_handler from "./input/cap2UI5/core/srv/z2ui5/02/z2ui5_cl_http_handler.js";
+// Resolved by build.mjs' abap2ui5-self-reference plugin (package-name
+// imports, matched by class basename over core/srv) — no coupling to the
+// upstream directory layout.
+import z2ui5_cl_util from "abap2UI5/z2ui5_cl_util";
+import z2ui5_cl_core_srv_draft from "abap2UI5/z2ui5_cl_core_srv_draft";
+import z2ui5_cl_http_handler from "abap2UI5/z2ui5_cl_http_handler";
 import registry from "./generated/registry.mjs";
 import { createDraftStore } from "./draft-store.mjs";
 

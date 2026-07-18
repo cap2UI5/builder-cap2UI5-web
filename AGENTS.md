@@ -40,6 +40,11 @@ framework **vendored at `core/`** (npm package `abap2UI5`):
 | `dev-server.mjs` | local static server (`npm run serve`, port 8080) |
 
 Build locally: `npm ci && npm run mirror && npm run build && npm run serve`.
+`npm run smoke` opens `dist/` in headless Chromium (Playwright) and asserts
+the shell actually renders (bundle active, UI5 booted, startup roundtrip
+answered) — CI runs it before every deploy. Sourcemaps are not emitted by
+default (2 MB per deploy, publishes the full sources); `WEB_SOURCEMAP=1`
+opts in locally.
 
 ## Invariants
 

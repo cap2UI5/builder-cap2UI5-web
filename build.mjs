@@ -69,7 +69,10 @@ const buildOptions = {
   format: "iife",
   platform: "browser",
   target: "es2022",
-  sourcemap: true,
+  // Off by default: the map is ~2 MB per deployment (unbounded git growth
+  // in web-cap2UI5-build) and publishes the full unminified sources on
+  // Pages. Opt in locally with WEB_SOURCEMAP=1 when debugging the bundle.
+  sourcemap: process.env.WEB_SOURCEMAP === "1",
   minify: true,
   // Draft persistence serializes apps under oApp.constructor.name and the
   // response's S_FRONT.APP carries it too — class names must survive

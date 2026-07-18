@@ -9,9 +9,11 @@
     "mirror": "node mirror.mjs",
     "registry": "node gen-registry.mjs",
     "build": "node build.mjs",
-    "serve": "node dev-server.mjs"
+    "serve": "node dev-server.mjs",
+    "smoke": "node smoke.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "playwright": "^1.61.1"
   }
 }
