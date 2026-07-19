@@ -14,7 +14,7 @@
     "smoke:live": "node live-smoke.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "playwright": "^1.61.1"
   }
 }
