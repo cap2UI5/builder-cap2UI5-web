@@ -10,7 +10,8 @@
     "registry": "node gen-registry.mjs",
     "build": "node build.mjs",
     "serve": "node dev-server.mjs",
-    "smoke": "node smoke.mjs"
+    "smoke": "node smoke.mjs",
+    "smoke:live": "node live-smoke.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
