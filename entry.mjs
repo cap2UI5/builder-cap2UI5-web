@@ -57,7 +57,11 @@ globalThis.fetch = async function (input, options = {}) {
     return nativeFetch(input, options);
   }
 
-  const method = (options.method || "GET").toUpperCase();
+  // Method/body may come either as (url, options) — how the webapp calls it —
+  // or folded into a Request object. Read from both so a
+  // fetch(new Request(url, { method, body })) is not misclassified as a GET.
+  const isRequest = typeof Request !== "undefined" && input instanceof Request;
+  const method = (options.method || (isRequest ? input.method : undefined) || "GET").toUpperCase();
 
   // CSRF prefetch / sap-terminate ack — same answer srv/server.js gives.
   if (method === "HEAD") {
@@ -72,9 +76,13 @@ globalThis.fetch = async function (input, options = {}) {
 
   // The frontend sends { value: <oBody> }; the handler unwraps
   // req.data.value itself — pass the parsed body through as req.data.
+  let rawBody = options.body;
+  if (rawBody == null && isRequest) {
+    try { rawBody = await input.clone().text(); } catch { rawBody = undefined; }
+  }
   let payload = {};
   try {
-    payload = options.body ? JSON.parse(options.body) : {};
+    payload = rawBody ? JSON.parse(rawBody) : {};
   } catch {
     // fall through with an empty body — the handler answers with its own
     // error payload, which the frontend renders in the error overlay
