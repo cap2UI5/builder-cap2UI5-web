@@ -109,8 +109,15 @@ const buildOptions = {
 // The registry is regenerated without the rejected files and the bundle
 // retried; sample classes are independent leaves, so each round can only
 // remove sample files, which bounds the loop.
+// Only BUNDLED SAMPLES may be auto-excluded and the bundle retried: they are
+// independent leaves, so dropping one can't affect the rest. A built-in
+// (core/srv/z2ui5/02) or an app class (srv/app) that esbuild rejects is a
+// REAL build failure and must surface — not be silently dropped from the
+// shipped bundle. Gate the retry on the samples directory prefix, not on the
+// whole registry (which includes the built-ins).
+const SAMPLES_DIR = path.join(CAP_DIR, "core", "srv", "app", "samples") + path.sep;
 const excludeFiles = new Set();
-const sampleFiles = new Set(generateRegistry({ excludeFiles }).files);
+generateRegistry({ excludeFiles });
 for (;;) {
   try {
     await esbuild.build(buildOptions);
@@ -119,7 +126,7 @@ for (;;) {
     const rejected = [...new Set(
       (e.errors || [])
         .map((err) => err.location?.file && path.resolve(err.location.file))
-        .filter((f) => f && sampleFiles.has(f) && !excludeFiles.has(f)),
+        .filter((f) => f && f.startsWith(SAMPLES_DIR) && !excludeFiles.has(f)),
     )];
     if (!rejected.length) throw e; // not a sample-class problem — real failure
     for (const f of rejected) {

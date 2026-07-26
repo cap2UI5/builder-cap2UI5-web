@@ -45,6 +45,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # fast gates before the (slower) mirror + browser build
+      - run: npm run lint
+      - run: npm test
       - run: npm run mirror
       - run: npm run build
       # browser smoke against dist/ — a blank page (broken bootstrap, CDN

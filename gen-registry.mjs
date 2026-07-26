@@ -33,7 +33,7 @@ const EXCLUDE = new Set(["register-apps", "z2ui5_cl_http_handler"]);
 
 // Same walk order as z2ui5_cl_util._walkClassFiles: top-level files first,
 // then subdirectories — so a top-level class shadows a nested duplicate.
-function walkClassFiles(dir, out = []) {
+export function walkClassFiles(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   const subdirs = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

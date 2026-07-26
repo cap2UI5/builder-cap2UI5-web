@@ -11,10 +11,14 @@
     "build": "node build.mjs",
     "serve": "node dev-server.mjs",
     "smoke": "node smoke.mjs",
-    "smoke:live": "node live-smoke.mjs"
+    "smoke:live": "node live-smoke.mjs",
+    "test": "node --test test/*.test.mjs",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "esbuild": "^0.25.0",
+    "eslint": "^9.39.5",
     "playwright": "^1.61.1"
   }
 }
