@@ -48,7 +48,11 @@ for the Pages deploy (polling `BUILD_INFO.json`, written by `build.mjs` —
 deterministic, upstream sha only) and reruns the suite against the live URL.
 A daily `health` workflow reruns the live smoke on cron to catch new
 OpenUI5 CDN releases breaking the deliberately unpinned bootstrap between
-deployments. Sourcemaps are not emitted by
+deployments; a second `freshness` job in the same workflow compares the
+deployed `BUILD_INFO.json` upstream sha against cap2UI5 `main` and turns
+red when the site lags by more than 48 h — the trigger chain publishes via
+deploy keys and skips silently when a secret is missing, so staleness is
+otherwise invisible. Sourcemaps are not emitted by
 default (2 MB per deploy, publishes the full sources); `WEB_SOURCEMAP=1`
 opts in locally.
 
