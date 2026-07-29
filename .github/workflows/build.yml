@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # report-scheduled-failure opens an issue on a red weekly build
 
 concurrency:
   group: deploy-built
@@ -40,8 +41,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - run: npm ci
@@ -60,7 +61,7 @@ jobs:
         run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
       - name: cache playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -73,7 +74,7 @@ jobs:
         run: echo "built from cap2UI5/cap2UI5@$(cat input/cap2UI5/UPSTREAM_COMMIT)" >> "$GITHUB_STEP_SUMMARY"
       # Upload before publish/verify so the built site is preserved for
       # debugging even when the deploy or the live verification fails.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cap2ui5-web
           path: dist
@@ -176,3 +177,8 @@ jobs:
           fi
           SMOKE_URL="${LIVE_URL}/" node live-smoke.mjs
           echo "live smoke OK against ${LIVE_URL}/" >> "$GITHUB_STEP_SUMMARY"
+      # push-triggered failures surface within a day via the daily health
+      # workflow (freshness check); the weekly cron reports directly
+      - name: report scheduled failure as issue
+        if: failure() && github.event_name == 'schedule'
+        uses: abap2UI5/abap2UI5/.github/actions/report-scheduled-failure@main

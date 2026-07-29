@@ -91,6 +91,8 @@ const buildOptions = {
     "node:path": stub("path.cjs"),
     crypto: stub("crypto.cjs"),
     "node:crypto": stub("crypto.cjs"),
+    async_hooks: stub("async_hooks.cjs"),
+    "node:async_hooks": stub("async_hooks.cjs"),
   },
   // CJS framework files reference __dirname (feeds only the stubbed fs) and
   // a few process.env switches (all optional).

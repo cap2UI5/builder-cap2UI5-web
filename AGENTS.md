@@ -36,7 +36,7 @@ framework **vendored at `core/`** (npm package `abap2UI5`):
 | `gen-registry.mjs` | smoke-requires every candidate class (anchor: `core/package.json`, so `abap2UI5/...` requires resolve via its exports map) → `generated/registry.mjs` |
 | `build.mjs` | esbuild bundle (resolves `abap2UI5/*` by basename over `core/srv`), webapp copy, index.html patch (bundle before UI5 bootstrap, UI5 from CDN) → `dist/` |
 | `entry.mjs` | browser entry: register classes, in-memory draft store, fetch interceptor for `*/rest/root/z2ui5` |
-| `stubs/` | build-time stand-ins for `@sap/cds`, `fs`, `path`, `crypto` |
+| `stubs/` | build-time stand-ins for `@sap/cds`, `fs`, `path`, `crypto`, `async_hooks` |
 | `dev-server.mjs` | local static server (`npm run serve`, port 8080) |
 | `live-smoke.mjs` | same smoke suite against the deployed Pages site (`npm run smoke:live`, or any URL via `SMOKE_URL=`) |
 
@@ -48,7 +48,11 @@ for the Pages deploy (polling `BUILD_INFO.json`, written by `build.mjs` —
 deterministic, upstream sha only) and reruns the suite against the live URL.
 A daily `health` workflow reruns the live smoke on cron to catch new
 OpenUI5 CDN releases breaking the deliberately unpinned bootstrap between
-deployments. Sourcemaps are not emitted by
+deployments; a second `freshness` job in the same workflow compares the
+deployed `BUILD_INFO.json` upstream sha against cap2UI5 `main` and turns
+red when the site lags by more than 48 h — the trigger chain publishes via
+deploy keys and skips silently when a secret is missing, so staleness is
+otherwise invisible. Sourcemaps are not emitted by
 default (2 MB per deploy, publishes the full sources); `WEB_SOURCEMAP=1`
 opts in locally.
 

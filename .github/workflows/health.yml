@@ -10,6 +10,15 @@ name: health
 # therefore break the live site *between* deployments, where build.yml's
 # post-deploy verification never looks. This cron catches that within a day.
 #
+# A second job (`freshness`) guards the other failure mode: the site can
+# render perfectly and still be STALE. The trigger chain
+# (cap2UI5 `trigger_web` → build.yml here → web-cap2UI5-build) publishes
+# via deploy keys and skips gracefully when a secret is unset, so a broken
+# hop fails silently — nothing turns red, the site just stops updating.
+# The job compares the deployed `BUILD_INFO.json` upstream sha against
+# cap2UI5 `main` and fails once the site lags by more than 48 h (enough
+# headroom for one missed nightly).
+#
 # 06:30 UTC — after the upstream nightly pipelines and well clear of the
 # weekly Sunday 03:00 build. A red run IS the signal; nothing is deployed
 # or pushed here.
@@ -26,8 +35,8 @@ jobs:
   live-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - run: npm ci
@@ -37,7 +46,7 @@ jobs:
         run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")" >> "$GITHUB_OUTPUT"
       - name: cache playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -47,3 +56,50 @@ jobs:
         run: npx playwright install-deps chromium
       - name: live smoke against the deployed site
         run: node live-smoke.mjs
+
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: deployed site is built from a recent cap2UI5 commit
+        run: |
+          set -euo pipefail
+          deployed=$(curl -fsSL https://cap2ui5.github.io/web-cap2UI5-build/BUILD_INFO.json | jq -r .upstream_commit)
+          echo "deployed upstream_commit: $deployed"
+          # Blobless clone: freshness only needs the commit graph, not trees.
+          git clone --quiet --filter=blob:none --single-branch --branch main \
+            https://github.com/cap2UI5/cap2UI5 upstream
+          cd upstream
+          head=$(git rev-parse HEAD)
+          if [ "$deployed" = "$head" ]; then
+            echo "site is current (deployed sha == cap2UI5 main HEAD)"
+            exit 0
+          fi
+          if ! git cat-file -e "$deployed^{commit}" 2>/dev/null; then
+            echo "::error::deployed commit $deployed is unknown in cap2UI5/cap2UI5 — the deploy and the app repo have diverged (rewritten history or a build from a non-main state); redeploy via build.yml"
+            exit 1
+          fi
+          # Age of the OLDEST commit on main that the deployed site does not
+          # include yet = how long the site has been stale.
+          oldest=$(git log --format=%ct "$deployed..HEAD" | tail -1)
+          if [ -z "$oldest" ]; then
+            echo "site is current (deployed sha is ahead of or equal to main)"
+            exit 0
+          fi
+          age_h=$(( ( $(date +%s) - oldest ) / 3600 ))
+          behind=$(git rev-list --count "$deployed..HEAD")
+          echo "site is $behind commit(s) / ${age_h}h behind cap2UI5 main"
+          if [ "$age_h" -ge 48 ]; then
+            echo "::error::deployed site is stale: the oldest undeployed cap2UI5 commit is ${age_h}h old (threshold 48h). Check the trigger chain: cap2UI5 trigger_web -> build.yml here -> web-cap2UI5-build (a missing/rotated deploy key skips the publish silently)."
+            exit 1
+          fi
+
+  report_failure:
+    # "a red run IS the signal" only helps if somebody sees it — open (or
+    # bump) an issue when the daily check fails.
+    needs: [live-smoke, freshness]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: abap2UI5/abap2UI5/.github/actions/report-scheduled-failure@main
