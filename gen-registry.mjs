@@ -26,10 +26,10 @@ import { ROOT_DIR, CAP_DIR } from "./paths.mjs";
 
 const OUT_FILE = path.join(ROOT_DIR, "generated", "registry.mjs");
 
-// Modules that live in the app folders but are not app classes —
-// z2ui5_cl_http_handler is the CDS action handler (and would pull @sap/cds
-// into the smoke-require).
-const EXCLUDE = new Set(["register-apps", "z2ui5_cl_http_handler"]);
+// Modules that live in the app folders but are not app classes — the HTTP
+// handler is the CDS action handler (and would pull @sap/cds into the
+// smoke-require); it is reachable under its new name and the compat one.
+const EXCLUDE = new Set(["register-apps", "z2ui5_cl_ui5_http_handler", "z2ui5_cl_http_handler", "z2ui5_cl_ui5_user_exit"]);
 
 // Same walk order as z2ui5_cl_util._walkClassFiles: top-level files first,
 // then subdirectories — so a top-level class shadows a nested duplicate.
@@ -47,12 +47,15 @@ export function walkClassFiles(dir, out = []) {
 
 export function generateRegistry({ excludeFiles = new Set() } = {}) {
   const candidates = [
-    // 1. framework built-ins (startup app, hello world, popups) —
+    // 1. framework built-ins — the shipped apps (startup, hello world) live
+    //    in 01/04 since the 2026-08 upstream rename, the popups in 99/02;
     //    non-recursive on 02/ so the core modules' subfolders stay out
+    ...walkClassFiles(path.join(CAP_DIR, "core/srv/z2ui5/01/04")),
     ...fs
       .readdirSync(path.join(CAP_DIR, "core/srv/z2ui5/02"))
       .filter((f) => f.endsWith(".js"))
       .map((f) => path.join(CAP_DIR, "core/srv/z2ui5/02", f)),
+    ...walkClassFiles(path.join(CAP_DIR, "core/srv/z2ui5/99/02")),
     ...walkClassFiles(path.join(CAP_DIR, "core/srv/z2ui5/02/01")),
     // 2. bundled samples, recursive (flattened by the core build)
     ...walkClassFiles(path.join(CAP_DIR, "core/srv/app/samples")),

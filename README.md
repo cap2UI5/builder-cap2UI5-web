@@ -18,7 +18,7 @@ build gets away with much less: no ABAP runtime, no WASM database — the
 of ~12 MB.
 
 Start a specific app exactly like on the CAP server:
-`index.html?app_start=z2ui5_cl_demo_app_001`.
+`index.html?app_start=z2ui5_cl_smp_app_001`.
 
 ## How it works
 
@@ -34,7 +34,7 @@ Browser
 └── z2ui5-web.js (bundle)
     ├── fetch interceptor  POST/HEAD to */rest/root/z2ui5 → in-process call,
     │                      everything else → native fetch
-    ├── z2ui5_cl_http_handler + core (core/srv/z2ui5, CAP-free)
+    ├── z2ui5_cl_ui5_http_handler + core (core/srv/z2ui5, CAP-free)
     ├── all sample apps + built-ins (static registry, generated at build time)
     └── in-memory draft store (Map — the tab IS the session)
 ```
@@ -45,7 +45,7 @@ that live in the cap2UI5 framework:
 | Node/CAP | Browser | Hook |
 |---|---|---|
 | app classes resolved by walking `srv/` directories + `require()` | static registry generated at build time | `z2ui5_cl_util.register_app_class()` |
-| drafts in the CDS entity `z2ui5_t_01` | in-memory `Map` | `z2ui5_cl_core_srv_draft.set_store()` |
+| drafts in the CDS entity `z2ui5_t_01` | in-memory `Map` | `z2ui5_cl_ui5_srv_draft.set_store()` |
 | `@sap/cds`, `fs`, `path`, `crypto` | build-time stubs (`stubs/`) — unreachable at runtime once the hooks above are installed | esbuild `alias` |
 
 ## Build
