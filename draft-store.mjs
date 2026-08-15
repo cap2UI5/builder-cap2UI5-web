@@ -1,6 +1,6 @@
 // In-memory draft store for the browser build.
 //
-// Implements the z2ui5_cl_core_srv_draft.set_store contract:
+// Implements the z2ui5_cl_ui5_srv_draft.set_store contract:
 //   load(id)                    → { id, id_prev, data } | null
 //   save({ id, id_prev, data }) → void
 //

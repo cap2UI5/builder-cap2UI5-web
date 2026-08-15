@@ -93,7 +93,7 @@ export async function runSmoke(base) {
             value: { S_FRONT: { ORIGIN: location.origin, PATHNAME: location.pathname, SEARCH: "", HASH: "", ...sFront } },
           }),
         }).then((r) => r.json());
-      const first = await post({ SEARCH: "?app_start=z2ui5_cl_app_hello_world" });
+      const first = await post({ SEARCH: "?app_start=z2ui5_cl_ui5_app_hi_world" });
       const second = await post({ ID: first.S_FRONT.ID });
       const head = await fetch("/rest/root/z2ui5", { method: "HEAD" });
       return {
@@ -105,16 +105,16 @@ export async function runSmoke(base) {
       };
     });
     const uuid = /^[0-9a-f-]{36}$/;
-    if (wire.firstApp !== "z2ui5_cl_app_hello_world") throw new Error(`app_start answered APP=${wire.firstApp}`);
+    if (wire.firstApp !== "z2ui5_cl_ui5_app_hi_world") throw new Error(`app_start answered APP=${wire.firstApp}`);
     if (!uuid.test(wire.firstId)) throw new Error(`app_start draft id malformed: ${wire.firstId}`);
-    if (wire.secondApp !== "z2ui5_cl_app_hello_world") throw new Error(`draft chaining lost the app: ${wire.secondApp}`);
+    if (wire.secondApp !== "z2ui5_cl_ui5_app_hi_world") throw new Error(`draft chaining lost the app: ${wire.secondApp}`);
     if (!uuid.test(wire.secondId) || wire.secondId === wire.firstId)
       throw new Error(`draft chaining did not answer a fresh draft id (${wire.secondId})`);
     if (wire.csrf !== "disabled") throw new Error(`HEAD did not answer x-csrf-token: disabled (got ${wire.csrf})`);
 
     // (5) app start through the real shell: URL-driven app_start renders and
     // leaves no dangling '#' (upstream HashChanger regression)
-    await page.goto(`${base}/index.html?app_start=z2ui5_cl_app_hello_world`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${base}/index.html?app_start=z2ui5_cl_ui5_app_hi_world`, { waitUntil: "domcontentloaded" });
     await waitForUi5Render(page);
     await page.waitForTimeout(250);
     if (page.url().includes("#")) throw new Error(`dangling '#' after app start: ${page.url()}`);

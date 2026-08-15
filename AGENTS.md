@@ -21,7 +21,9 @@ web-cap2UI5-build (one commit per deployment).
 The mirrored cap2UI5 repo is the app at the **repo root**, with the
 framework **vendored at `core/`** (npm package `abap2UI5`):
 
-- framework classes: `core/srv/z2ui5/` (built-ins in `02/`, + `02/01/`)
+- framework classes: `core/srv/z2ui5/` (the shipped apps in `01/04/`
+  since the 2026-08 upstream rename, the popups in `99/02/`, the rest in
+  `02/` + `02/01/`)
 - bundled samples (flat): `core/srv/app/samples/`
 - the app's own custom apps: `srv/app/` (server-only ones like
   `z2ui5_cl_app_read_odata` fail the smoke-require and are skipped — correct)

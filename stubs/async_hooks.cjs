@@ -1,4 +1,4 @@
-// Browser stub for node:async_hooks — z2ui5_cl_exit uses AsyncLocalStorage
+// Browser stub for node:async_hooks — z2ui5_cl_ui5_user_exit uses AsyncLocalStorage
 // to isolate the per-request HTTP context between interleaved roundtrips on
 // the CAP server. The static site serves one user in one tab, so a real
 // async-context implementation is not needed: run() keeps the store active

@@ -21,7 +21,7 @@ test("join matches posix for common shapes", () => {
     ["a", "..", "b"],
     ["/a/b", "../c"],
     ["a", ".", "b"],
-    ["core", "srv", "z2ui5", "02", "z2ui5_cl_app_hello_world.js"],
+    ["core", "srv", "z2ui5", "02", "z2ui5_cl_ui5_app_hi_world.js"],
   ];
   for (const c of cases) assert.equal(stub.join(...c), posix.join(...c), `join(${c})`);
 });

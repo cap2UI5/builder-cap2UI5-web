@@ -11,7 +11,7 @@
 //   1. register all app classes (the browser has no filesystem, so the
 //      framework's directory walk finds nothing — the registry generated
 //      by gen-registry.mjs replaces it)
-//   2. plug the in-memory draft store into z2ui5_cl_core_srv_draft
+//   2. plug the in-memory draft store into z2ui5_cl_ui5_srv_draft
 //      (replaces the CDS entity z2ui5_t_01)
 //   3. install the fetch interceptor
 //
@@ -23,8 +23,8 @@
 // imports, matched by class basename over core/srv) — no coupling to the
 // upstream directory layout.
 import z2ui5_cl_util from "abap2UI5/z2ui5_cl_util";
-import z2ui5_cl_core_srv_draft from "abap2UI5/z2ui5_cl_core_srv_draft";
-import z2ui5_cl_http_handler from "abap2UI5/z2ui5_cl_http_handler";
+import z2ui5_cl_ui5_srv_draft from "abap2UI5/z2ui5_cl_ui5_srv_draft";
+import z2ui5_cl_ui5_http_handler from "abap2UI5/z2ui5_cl_ui5_http_handler";
 import registry from "./generated/registry.mjs";
 import { createDraftStore } from "./draft-store.mjs";
 
@@ -35,7 +35,7 @@ for (const [name, Cls] of Object.entries(registry)) {
 }
 
 // 2. Draft persistence — in-memory, session == browser tab.
-z2ui5_cl_core_srv_draft.set_store(createDraftStore());
+z2ui5_cl_ui5_srv_draft.set_store(createDraftStore());
 
 // 3. Fetch interceptor. The endpoint is the manifest's dataSource uri
 //    ("/rest/root/z2ui5"); match on the trailing path so the interceptor
@@ -89,7 +89,7 @@ globalThis.fetch = async function (input, options = {}) {
   }
 
   try {
-    const result = await z2ui5_cl_http_handler({ data: payload });
+    const result = await z2ui5_cl_ui5_http_handler({ data: payload });
     // The handler's error path returns { body, status_code, status_reason }
     // instead of the parsed wire payload — map it onto the HTTP status the
     // CAP runtime would have produced.

@@ -160,7 +160,7 @@ let html = fs.readFileSync(indexFile, "utf8");
 //
 // OpenUI5 only — the proprietary SAPUI5 distribution (ui5.sap.com) must NOT
 // be used. Use the OpenUI5 CDN entry point the framework itself defaults to
-// (z2ui5_cl_app_index_html) — sdk.openui5.org's cachebuster serves the
+// (z2ui5_cl_ui5f_index_html) — sdk.openui5.org's cachebuster serves the
 // current stable OpenUI5, which is exactly what the upstream abap2UI5 web
 // samples run on. (Pinning to a specific patch is unreliable: old versions
 // like 1.113.0 are pruned from the CDN, and a 404 there leaves a blank page.)
