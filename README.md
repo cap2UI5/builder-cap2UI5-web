@@ -14,8 +14,8 @@ This is the cap2UI5 twin of
 which bundles the abaplint-transpiled ABAP sources with `@abaplint/runtime`
 and a WASM SQLite. cap2UI5's backend is already plain JavaScript, so this
 build gets away with much less: no ABAP runtime, no WASM database — the
-`z2ui5-web.js` bundle is ~790 KB minified — **~175 KB gzipped**, which is
-what a visitor actually downloads — and the whole site ~1.5 MB, instead of
+`z2ui5-web.js` bundle is ~550 KB minified — **~125 KB gzipped**, which is
+what a visitor actually downloads — and the whole site ~1.1 MB, instead of
 ~12 MB.
 
 Start a specific app exactly like on the CAP server:
