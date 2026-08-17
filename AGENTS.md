@@ -37,6 +37,7 @@ framework **vendored at `core/`** (npm package `abap2UI5`):
 | `mirror.mjs` | clone/copy the app repo → `input/cap2UI5/` (whole root, minus `.git`/`.github`/`node_modules`); `MIRROR_SOURCE=/path` uses a local checkout |
 | `gen-registry.mjs` | smoke-requires every candidate class (anchor: `core/package.json`, so `abap2UI5/...` requires resolve via its exports map) → `generated/registry.mjs` |
 | `build.mjs` | esbuild bundle (resolves `abap2UI5/*` by basename over `core/srv`), webapp copy, index.html patch (bundle before UI5 bootstrap, UI5 from CDN) → `dist/` |
+| `roundtrip.mjs` | the in-browser backend's request handling (endpoint matching, method/body extraction, error mapping, the fetch-interceptor install) — split out of `entry.mjs` so it is unit-testable without a browser | yes |
 | `entry.mjs` | browser entry: register classes, in-memory draft store, fetch interceptor for `*/rest/root/z2ui5` |
 | `stubs/` | build-time stand-ins for `@sap/cds`, `fs`, `path`, `crypto`, `async_hooks` |
 | `dev-server.mjs` | local static server (`npm run serve`, port 8080) |

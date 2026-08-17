@@ -12,6 +12,7 @@
 // is answered in-process by the bundled backend.
 
 import fs from "node:fs";
+import zlib from "node:zlib";
 import path from "node:path";
 import * as esbuild from "esbuild";
 import { generateRegistry } from "./gen-registry.mjs";
@@ -23,6 +24,13 @@ if (!fs.existsSync(CAP_DIR)) {
   throw new Error("input/cap2UI5 is missing — run `npm run mirror` first");
 }
 const BUNDLE_NAME = "z2ui5-web.js";
+
+// Start from an empty dist. Nothing here ever deletes, it only writes and
+// copies over — so a file that disappeared upstream (a removed webapp module,
+// a renamed bundle) would survive locally and keep the smoke test green on a
+// site that no longer builds from scratch. CI always runs on a fresh
+// checkout; this is what makes a local build match it.
+fs.rmSync(DIST, { recursive: true, force: true });
 
 // ---- 1. + 2. registry & bundle ---------------------------------------------
 
@@ -182,8 +190,81 @@ const injected =
   html.slice(idx);
 fs.writeFileSync(indexFile, injected);
 
+// The upstream webapp is abap2UI5's, and says so in its <title> and
+// manifest. On the cap2UI5 playground that is simply the wrong name in the
+// browser tab, in bookmarks and in link previews.
+const SITE_TITLE = "cap2UI5 — Browser Playground";
+html = fs.readFileSync(indexFile, "utf8");
+if (/<title>[^<]*<\/title>/.test(html)) {
+  fs.writeFileSync(indexFile, html.replace(/<title>[^<]*<\/title>/, `<title>${SITE_TITLE}</title>`));
+}
+const manifestFile = path.join(DIST, "manifest.json");
+if (fs.existsSync(manifestFile)) {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+    if (manifest["sap.app"]?.title) manifest["sap.app"].title = SITE_TITLE;
+    fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
+  } catch (e) {
+    // A malformed manifest is the frontend's problem, not the title patch's.
+    console.warn(`manifest.json: title not patched (${e.message})`);
+  }
+}
+
 // GitHub Pages: serve folders starting with _ etc. as-is.
 fs.writeFileSync(path.join(DIST, ".nojekyll"), "");
+
+// A mistyped path otherwise lands on the generic GitHub Pages 404, which
+// offers no way back into the app.
+fs.writeFileSync(
+  path.join(DIST, "404.html"),
+  `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${SITE_TITLE} — not found</title>
+  <meta http-equiv="refresh" content="3; url=./index.html">
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 34rem; padding: 0 1rem; }
+    a { color: #0064d9; }
+  </style>
+</head>
+<body>
+  <h1>Not found</h1>
+  <p>That page is not part of the cap2UI5 playground.</p>
+  <p>Taking you <a href="./index.html">back to the app</a>&nbsp;…</p>
+</body>
+</html>
+`,
+);
+
+// The deploy target (web-cap2UI5-build) is a pure artifact repo: everything
+// in it is overwritten on every deploy. Without these two files it is a
+// pile of generated code with no statement of what it is, who writes it or
+// where to send a fix — every other repo in the ecosystem documents that.
+fs.writeFileSync(
+  path.join(DIST, "README.md"),
+  `# web-cap2UI5-build
+
+**This repository is a build artifact. Do not edit it — every deploy wipes
+and rewrites it.**
+
+The static, backend-less build of [cap2UI5](https://github.com/cap2UI5/cap2UI5),
+served at <https://cap2ui5.github.io/web-cap2UI5-build/>. The whole framework
+runs in the browser: roundtrips that would go to the CAP server are answered
+in-process, drafts live in memory, and the tab is the session.
+
+| | |
+|---|---|
+| Built by | [builder-cap2UI5-web](https://github.com/cap2UI5/builder-cap2UI5-web) |
+| Built from | [cap2UI5/cap2UI5](https://github.com/cap2UI5/cap2UI5) — see \`BUILD_INFO.json\` for the exact commit |
+| Report a problem | with the playground: [builder-cap2UI5-web](https://github.com/cap2UI5/builder-cap2UI5-web/issues) · with the framework: [cap2UI5](https://github.com/cap2UI5/cap2UI5/issues) |
+
+Each commit here is one deployment; its message names the upstream commit it
+was built from, so \`git log\` is the deployment history.
+`,
+);
+const licenseSrc = path.join(ROOT_DIR, "LICENSE");
+if (fs.existsSync(licenseSrc)) fs.copyFileSync(licenseSrc, path.join(DIST, "LICENSE"));
 
 // BUILD_INFO.json — deployment marker served next to the site. CI's
 // post-deploy verification polls it on the live URL to detect when the
@@ -219,6 +300,24 @@ fs.writeFileSync(
     throw new Error(`web build: shell sanity check failed —\n  - ${problems.join("\n  - ")}`);
   }
   console.log(`web build: shell OK — UI5 from ${bootSrc}`);
+}
+
+// Report the sizes that matter, so the numbers quoted in the README can be
+// checked against an actual build instead of drifting unnoticed. gzip is the
+// honest figure: it is what GitHub Pages serves and what a visitor waits for.
+{
+  const bundleBytes = fs.statSync(path.join(DIST, BUNDLE_NAME)).size;
+  const gzipBytes = zlib.gzipSync(fs.readFileSync(path.join(DIST, BUNDLE_NAME))).length;
+  let siteBytes = 0;
+  (function total(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) total(p);
+      else siteBytes += fs.statSync(p).size;
+    }
+  })(DIST);
+  const kb = (n) => `${Math.round(n / 1024)} KB`;
+  console.log(`web build: ${BUNDLE_NAME} ${kb(bundleBytes)} (${kb(gzipBytes)} gzipped), site ${kb(siteBytes)}`);
 }
 
 console.log(`web build complete → ${path.relative(process.cwd(), DIST)}`);
