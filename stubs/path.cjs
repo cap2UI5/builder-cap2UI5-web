@@ -1,6 +1,6 @@
 // Browser stub for node:path — minimal posix implementation covering the
 // calls the framework makes (join/resolve/relative/basename/dirname). Paths
-// only feed fs lookups that always miss in the browser (see stubs/fs.js),
+// only feed fs lookups that always miss in the browser (see stubs/fs.cjs),
 // so string-level correctness is all that is needed.
 
 function normalize(p) {

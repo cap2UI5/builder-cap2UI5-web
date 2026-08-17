@@ -3,6 +3,17 @@
 // (input/, generated/, dist/) and node_modules are excluded.
 import js from "@eslint/js";
 
+// WHATWG fetch globals. In the page they are the browser's; under Node they
+// have been built in since 18. Both the interceptor and its node:test suite
+// use them, so they are shared rather than duplicated per scope.
+const fetchGlobals = {
+  fetch: "readonly",
+  Response: "readonly",
+  Request: "readonly",
+  Headers: "readonly",
+  URL: "readonly",
+};
+
 const nodeGlobals = {
   process: "readonly",
   __dirname: "readonly",
@@ -27,19 +38,18 @@ export default [
     },
   },
   {
-    // The browser entry runs in the page, not in Node.
-    files: ["entry.mjs"],
+    // The browser entry and the interceptor it installs run in the page,
+    // not in Node — except roundtrip.mjs, which is also exercised directly
+    // by the node:test suite.
+    files: ["entry.mjs", "roundtrip.mjs", "draft-store.mjs"],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: "module",
       globals: {
+        ...fetchGlobals,
         window: "readonly",
         document: "readonly",
         globalThis: "readonly",
-        fetch: "readonly",
-        Response: "readonly",
-        Request: "readonly",
-        URL: "readonly",
         console: "readonly",
       },
     },
@@ -71,6 +81,6 @@ export default [
   {
     // node:test suites.
     files: ["test/**/*.mjs"],
-    languageOptions: { sourceType: "module", globals: { ...nodeGlobals } },
+    languageOptions: { sourceType: "module", globals: { ...nodeGlobals, ...fetchGlobals } },
   },
 ];
