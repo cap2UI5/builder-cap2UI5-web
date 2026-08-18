@@ -8,11 +8,22 @@ Runs the complete [cap2UI5](https://github.com/cap2UI5/cap2UI5) stack
 is answered in-process — no CAP server, no Node.js, just static files on
 GitHub Pages.
 
+> [!IMPORTANT]
+> Everything in this project is generated automatically — by AI (Claude) and
+> by a sync pipeline that consumes the upstream
+> [abap2UI5](https://github.com/abap2UI5/abap2UI5) sources. Review and test
+> before relying on it.
+
+The full documentation lives in [cap2UI5/docs](https://github.com/cap2UI5/docs).
+
 This is the cap2UI5 twin of
-[abap2UI5-web](https://github.com/abap2UI5/abap2UI5-web) (the build behind
-[web-abap2ui5-samples](https://github.com/abap2UI5/web-abap2ui5-samples)),
-which bundles the abaplint-transpiled ABAP sources with `@abaplint/runtime`
-and a WASM SQLite. cap2UI5's backend is already plain JavaScript, so this
+[web-abap2UI5](https://github.com/abap2UI5/web-abap2UI5) — the tooling
+repo over there, which bundles the abaplint-transpiled ABAP sources with
+`@abaplint/runtime` and a WASM SQLite and deploys the result to
+[web-abap2UI5-build](https://github.com/abap2UI5/web-abap2UI5-build)
+([live demo](https://abap2ui5.github.io/web-abap2UI5-build/)). The split is
+the same one used here: tooling in the source repo, built site in the
+`-build` repo. cap2UI5's backend is already plain JavaScript, so this
 build gets away with much less: no ABAP runtime, no WASM database — the
 `z2ui5-web.js` bundle is ~550 KB minified — **~125 KB gzipped**, which is
 what a visitor actually downloads — and the whole site ~1.1 MB, instead of

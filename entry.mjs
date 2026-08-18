@@ -1,7 +1,7 @@
 // Browser entry point of the cap2UI5 web build.
 //
-// Mirrors the concept of abap2UI5-web (the build behind
-// web-abap2ui5-samples): the unchanged UI5 frontend keeps doing its normal
+// Mirrors the concept of abap2UI5/web-abap2UI5 (whose builds are served
+// from web-abap2UI5-build): the unchanged UI5 frontend keeps doing its normal
 // `fetch(url, { method: "POST", body })` roundtrip, but fetch calls that
 // target the z2ui5 endpoint are intercepted and answered by the bundled
 // backend in-process — no server involved. Everything else (UI5 CDN,
