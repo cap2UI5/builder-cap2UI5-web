@@ -192,8 +192,12 @@ fs.writeFileSync(indexFile, injected);
 
 // The upstream webapp is abap2UI5's, and says so in its <title> and
 // manifest. On the cap2UI5 playground that is simply the wrong name in the
-// browser tab, in bookmarks and in link previews.
+// browser tab, in bookmarks and in link previews — and the manifest
+// description ("Create UI5 apps purely in ABAP") is abap2UI5's tagline,
+// which is the opposite of what this site demonstrates: here the apps are
+// written in JavaScript and answered in-process in the browser.
 const SITE_TITLE = "cap2UI5 — Browser Playground";
+const SITE_DESCRIPTION = "Create UI5 apps purely in JavaScript";
 html = fs.readFileSync(indexFile, "utf8");
 if (/<title>[^<]*<\/title>/.test(html)) {
   fs.writeFileSync(indexFile, html.replace(/<title>[^<]*<\/title>/, `<title>${SITE_TITLE}</title>`));
@@ -203,6 +207,7 @@ if (fs.existsSync(manifestFile)) {
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
     if (manifest["sap.app"]?.title) manifest["sap.app"].title = SITE_TITLE;
+    if (manifest["sap.app"]?.description) manifest["sap.app"].description = SITE_DESCRIPTION;
     fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
   } catch (e) {
     // A malformed manifest is the frontend's problem, not the title patch's.

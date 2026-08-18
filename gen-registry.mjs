@@ -48,14 +48,15 @@ export function walkClassFiles(dir, out = []) {
 export function generateRegistry({ excludeFiles = new Set() } = {}) {
   const candidates = [
     // 1. framework built-ins — the shipped apps (startup, hello world) live
-    //    in 01/04 since the 2026-08 upstream rename, the popups in 99/02;
-    //    non-recursive on 02/ so the core modules' subfolders stay out
+    //    in 01/04 since the 2026-08 upstream rename; non-recursive on 02/ so
+    //    the core modules' subfolders stay out. There is no 99/ here:
+    //    upstream's frozen src/99 (the retired utils and the built-in popups)
+    //    is not carried into the core package at all.
     ...walkClassFiles(path.join(CAP_DIR, "core/srv/z2ui5/01/04")),
     ...fs
       .readdirSync(path.join(CAP_DIR, "core/srv/z2ui5/02"))
       .filter((f) => f.endsWith(".js"))
       .map((f) => path.join(CAP_DIR, "core/srv/z2ui5/02", f)),
-    ...walkClassFiles(path.join(CAP_DIR, "core/srv/z2ui5/99/02")),
     ...walkClassFiles(path.join(CAP_DIR, "core/srv/z2ui5/02/01")),
     // 2. bundled samples, recursive (flattened by the core build)
     ...walkClassFiles(path.join(CAP_DIR, "core/srv/app/samples")),
