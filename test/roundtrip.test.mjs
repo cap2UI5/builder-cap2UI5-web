@@ -13,6 +13,7 @@ import {
   targetsRoundtrip,
   methodOf,
   bodyOf,
+  signalOf,
   handleRoundtrip,
   installFetchInterceptor,
 } from "../roundtrip.mjs";
@@ -151,6 +152,61 @@ test("POST is answered locally, everything else goes to the network", async () =
   await target.fetch("/manifest.json");
   assert.equal(engine.calls.length, 1);
   assert.equal(target.passedThrough.length, 2);
+});
+
+test("signalOf reads the signal off a Request, not just the options bag", () => {
+  const ac = new AbortController();
+  assert.equal(signalOf("http://h/x", { signal: ac.signal }), ac.signal);
+  assert.equal(signalOf("http://h/x"), undefined);
+
+  // A Request does not hand back the signal it was given but a derived one,
+  // so the identity cannot be compared — the abort travelling through it can.
+  const fromRequest = signalOf(new Request("http://h/x", { signal: ac.signal }));
+  assert.equal(fromRequest.aborted, false);
+  ac.abort();
+  assert.equal(fromRequest.aborted, true);
+});
+
+test("an already aborted call is rejected, not answered", async () => {
+  const engine = fakeEngine();
+  const target = fakeTarget();
+  installFetchInterceptor(engine, target);
+
+  const ac = new AbortController();
+  ac.abort();
+  await assert.rejects(() => target.fetch(ROUNDTRIP_PATH, { method: "POST", body: "{}", signal: ac.signal }));
+  // and the framework was never entered
+  assert.equal(engine.calls.length, 0);
+});
+
+test("aborting a pending roundtrip rejects the caller's promise", async () => {
+  // The in-process call cannot be cancelled, but the caller MUST see the
+  // abort: a component that aborts on destroy, a timeout wrapper or a test
+  // with an AbortController would otherwise wait forever and then be handed
+  // an answer for a view that has moved on.
+  let release;
+  const engine = {
+    calls: [],
+    roundtrip: () => new Promise((resolve) => (release = () => resolve(JSON.stringify({ S_FRONT: {} })))),
+  };
+  const target = fakeTarget();
+  installFetchInterceptor(engine, target);
+
+  const ac = new AbortController();
+  const pending = target.fetch(ROUNDTRIP_PATH, { method: "POST", body: "{}", signal: ac.signal });
+  ac.abort();
+  await assert.rejects(() => pending, (e) => e.name === "AbortError");
+  release(); // the late answer must not turn into an unhandled rejection
+});
+
+test("a roundtrip without a signal is unaffected", async () => {
+  const engine = fakeEngine();
+  const target = fakeTarget();
+  installFetchInterceptor(engine, target);
+
+  const res = await target.fetch(ROUNDTRIP_PATH, { method: "POST", body: "{}" });
+  assert.equal(res.status, 200);
+  assert.equal(engine.calls.length, 1);
 });
 
 test("installing twice does not wrap the patched fetch", async () => {

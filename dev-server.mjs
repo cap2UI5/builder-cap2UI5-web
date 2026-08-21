@@ -26,7 +26,10 @@ http
   .createServer((req, res) => {
     const urlPath = decodeURIComponent(req.url.split(/[?#]/)[0]);
     let file = path.normalize(path.join(DIST, urlPath));
-    if (!file.startsWith(DIST)) {
+    // Separator-aware: a bare startsWith(DIST) also accepts a sibling
+    // "dist-x/" that ../ can escape into, so the traversal guard would let
+    // anything next to dist/ be served.
+    if (file !== DIST && !file.startsWith(DIST + path.sep)) {
       res.writeHead(403).end();
       return;
     }
