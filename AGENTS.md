@@ -39,8 +39,11 @@ framework **vendored at `core/`** (npm package `abap2UI5`):
 |---|---|
 | `mirror.mjs` | clone/copy the app repo → `input/cap2UI5/` (whole root, minus `.git`/`.github`/`node_modules`); `MIRROR_SOURCE=/path` uses a local checkout |
 | `gen-registry.mjs` | smoke-requires every candidate class (anchor: `core/package.json`, so `abap2UI5/...` requires resolve via its exports map) → `generated/registry.mjs` |
-| `build.mjs` | esbuild bundle (resolves `abap2UI5/*` by basename over `core/srv`), webapp copy, index.html patch (bundle before UI5 bootstrap, UI5 from CDN) → `dist/` |
-| `roundtrip.mjs` | the in-browser backend's request handling (endpoint matching, method/body extraction, error mapping, the fetch-interceptor install) — split out of `entry.mjs` so it is unit-testable without a browser | yes |
+| `build.mjs` | esbuild bundle (resolves `abap2UI5/*` by basename over `core/srv`), webapp copy, index.html patch (bundle before UI5 bootstrap, UI5 from CDN), `samples.html` → `dist/` |
+| `patch-index.mjs` | the index.html/manifest substitutions as pure functions (bundle injection, bootstrap → OpenUI5 CDN, title/description) plus the shell sanity gate — each throws when its anchor is gone instead of no-op'ing a blank deploy |
+| `samples-page.mjs` | `dist/samples.html`: the sample landing page, titles read from the overview app's own catalogue table, entries from the registry |
+| `build-info.mjs` | assembles `BUILD_INFO.json` (upstream sha, registry count, auto-excluded samples, resolved OpenUI5 version) — the file whose determinism the deploy step depends on |
+| `roundtrip.mjs` | the in-browser backend's request handling (endpoint matching, method/body/signal extraction, abort handling, error mapping, the fetch-interceptor install) — split out of `entry.mjs` so it is unit-testable without a browser | yes |
 | `entry.mjs` | browser entry: register classes, in-memory draft store, fetch interceptor for `*/rest/root/z2ui5` |
 | `stubs/` | build-time stand-ins for `@sap/cds`, `fs`, `path`, `crypto`, `async_hooks` |
 | `dev-server.mjs` | local static server (`npm run serve`, port 8080) |
@@ -50,8 +53,11 @@ Build locally: `npm ci && npm run mirror && npm run build && npm run serve`.
 `npm run smoke` opens `dist/` in headless Chromium (Playwright) and asserts
 the shell actually renders (bundle active, UI5 booted, startup roundtrip
 answered) — CI runs it before every deploy, and after each deploy it waits
-for the Pages deploy (polling `BUILD_INFO.json`, written by `build.mjs` —
-deterministic, upstream sha only) and reruns the suite against the live URL.
+for the Pages deploy (polling `BUILD_INFO.json`, written by `build.mjs` via
+`build-info.mjs` — deterministic: upstream sha, registry count, auto-excluded
+samples and the OpenUI5 version the unpinned bootstrap resolved to, which is
+simply omitted when the CDN cannot be reached) and reruns the suite against
+the live URL.
 A daily `health` workflow reruns the live smoke on cron to catch new
 OpenUI5 CDN releases breaking the deliberately unpinned bootstrap between
 deployments; a second `freshness` job in the same workflow compares the
@@ -70,6 +76,13 @@ opts in locally.
   bundle retried — that loop only ever removes sample files.
 - The registry walk order mirrors the runtime discovery (built-ins →
   bundled samples → `srv/app`), first hit per class name wins.
+- **A registry below 50 classes fails the build.** `walkClassFiles` answers
+  `[]` for a directory that is not there, so a renamed samples folder upstream
+  would otherwise produce a valid registry of ~6 built-ins, a shell that boots
+  and a green deploy of a playground with no samples in it.
+- **Nothing non-deterministic may enter `BUILD_INFO.json`** — no dates, no
+  build ids, no error strings. The publish step compares it byte-for-byte to
+  decide whether to deploy at all.
 
 ## Trigger / deploy chain
 

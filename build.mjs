@@ -5,6 +5,8 @@
 //                          dist/z2ui5-web.js with Node-API stubs
 //   3. copy the unchanged UI5 frontend (app/z2ui5/webapp from the mirror)
 //   4. patch dist/index.html so the bundle loads BEFORE the UI5 bootstrap
+//   5. generate dist/samples.html — the landing page listing every shipped
+//      sample, deep-linked into the playground
 //
 // Input is the upstream snapshot under input/cap2UI5/ — run
 // `npm run mirror` first. The result is fully static — open it from any
@@ -16,6 +18,9 @@ import zlib from "node:zlib";
 import path from "node:path";
 import * as esbuild from "esbuild";
 import { generateRegistry } from "./gen-registry.mjs";
+import { patchIndexHtml, patchManifest, shellProblems } from "./patch-index.mjs";
+import { parseSampleCatalog, sampleEntries, renderSamplesPage } from "./samples-page.mjs";
+import { resolveOpenUI5Version, buildInfoJson } from "./build-info.mjs";
 import { ROOT_DIR, CAP_DIR, DIST_DIR } from "./paths.mjs";
 
 const DIST = DIST_DIR;
@@ -47,7 +52,20 @@ const frameworkFiles = new Map(); // basename → absolute path
     if (entry.isDirectory()) walk(p);
     else if (entry.name.endsWith(".js")) {
       const name = path.basename(entry.name, ".js");
-      if (!frameworkFiles.has(name)) frameworkFiles.set(name, p);
+      // First hit wins, matching the runtime's name-based lookup — but say so.
+      // Two files with the same basename mean one of them is unreachable
+      // through require("abap2UI5/<name>"), and which one that is depends on
+      // directory order: exactly the kind of thing an upstream move does by
+      // accident, and it would otherwise only surface as a sample behaving
+      // like a different class.
+      if (frameworkFiles.has(name)) {
+        console.warn(
+          `bundle: duplicate class basename ${name} — abap2UI5/${name} resolves to ` +
+            `${path.relative(CAP_DIR, frameworkFiles.get(name))}, ignoring ${path.relative(CAP_DIR, p)}`,
+        );
+      } else {
+        frameworkFiles.set(name, p);
+      }
     }
   }
 })(path.join(CAP_DIR, "core", "srv"));
@@ -126,8 +144,29 @@ const buildOptions = {
 // shipped bundle. Gate the retry on the samples directory prefix, not on the
 // whole registry (which includes the built-ins).
 const SAMPLES_DIR = path.join(CAP_DIR, "core", "srv", "app", "samples") + path.sep;
+
+// The registry is built by walking directories, and walkClassFiles answers []
+// for a directory that is not there. A renamed or moved samples folder
+// upstream therefore produces a perfectly valid registry of ~6 built-ins, a
+// bundle that builds, a shell that boots and a smoke test that passes on
+// z2ui5_cl_ui5_app_hi_world — a green deploy of a playground with no samples
+// in it. Nothing else in the pipeline notices; this floor does. It sits far
+// enough below the ~110 classes a healthy build produces to survive samples
+// being added, removed or rejected by esbuild.
+const MIN_REGISTRY_CLASSES = 50;
+function generateRegistryOrFail(options) {
+  const result = generateRegistry(options);
+  if (result.count < MIN_REGISTRY_CLASSES) {
+    throw new Error(
+      `registry: only ${result.count} class(es) — expected at least ${MIN_REGISTRY_CLASSES}. ` +
+        `Did the samples move? Checked ${path.relative(CAP_DIR, SAMPLES_DIR)} and the built-ins under core/srv/z2ui5.`,
+    );
+  }
+  return result;
+}
+
 const excludeFiles = new Set();
-generateRegistry({ excludeFiles });
+let registry = generateRegistryOrFail({ excludeFiles });
 for (;;) {
   try {
     await esbuild.build(buildOptions);
@@ -143,7 +182,7 @@ for (;;) {
       excludeFiles.add(f);
       console.warn(`bundle: excluding ${path.relative(CAP_DIR, f)} (rejected by esbuild), retrying`);
     }
-    generateRegistry({ excludeFiles });
+    registry = generateRegistryOrFail({ excludeFiles });
   }
 }
 
@@ -152,67 +191,47 @@ const WEBAPP = path.join(CAP_DIR, "app", "z2ui5", "webapp");
 fs.cpSync(WEBAPP, DIST, { recursive: true });
 
 // ---- 4. index.html ----------------------------------------------------------
-// Load the bundle before the UI5 bootstrap so the fetch interceptor, the
-// class registry and the draft store are in place before the component
-// fires its first roundtrip.
-const indexFile = path.join(DIST, "index.html");
-const marker = "<script";
-let html = fs.readFileSync(indexFile, "utf8");
-
-// The upstream webapp boots UI5 from the server-absolute path
-// "/resources/sap-ui-core.js" — on the CAP server /resources is proxied to
-// UI5, but the static site has no such server. Served from a project
-// subpath on GitHub Pages that URL resolves to <origin>/resources/... and
-// 404s, so UI5 never loads and the page stays blank. Repoint the bootstrap
-// at the public UI5 CDN so the shell loads standalone from any static host.
-//
-// OpenUI5 only — the proprietary SAPUI5 distribution (ui5.sap.com) must NOT
-// be used. Use the OpenUI5 CDN entry point the framework itself defaults to
-// (z2ui5_cl_ui5f_index_html) — sdk.openui5.org's cachebuster serves the
-// current stable OpenUI5, which is exactly what the upstream abap2UI5 web
-// samples run on. (Pinning to a specific patch is unreliable: old versions
-// like 1.113.0 are pruned from the CDN, and a 404 there leaves a blank page.)
-const BOOTSTRAP_LOCAL_SRC = 'src="/resources/sap-ui-core.js"';
-const UI5_CDN_SRC = 'src="https://sdk.openui5.org/resources/sap-ui-cachebuster/sap-ui-core.js"';
-if (html.includes(BOOTSTRAP_LOCAL_SRC)) {
-  html = html.replace(BOOTSTRAP_LOCAL_SRC, UI5_CDN_SRC);
-} else if (!html.includes(UI5_CDN_SRC)) {
-  throw new Error(
-    `index.html: UI5 bootstrap ${BOOTSTRAP_LOCAL_SRC} not found — cannot repoint it at the CDN`,
-  );
-}
-
-const idx = html.indexOf(marker);
-if (idx < 0) throw new Error("index.html: no <script> tag found to anchor the bundle injection");
-const injected =
-  html.slice(0, idx) +
-  `<script src="./${BUNDLE_NAME}"></script>\n    ` +
-  html.slice(idx);
-fs.writeFileSync(indexFile, injected);
-
-// The upstream webapp is abap2UI5's, and says so in its <title> and
-// manifest. On the cap2UI5 playground that is simply the wrong name in the
-// browser tab, in bookmarks and in link previews — and the manifest
-// description ("Create UI5 apps purely in ABAP") is abap2UI5's tagline,
-// which is the opposite of what this site demonstrates: here the apps are
-// written in JavaScript and answered in-process in the browser.
+// The substitutions themselves live in patch-index.mjs (pure functions over
+// strings, unit-tested there) — they are what stands between an upstream
+// <head> change and a blank deploy, and each of them throws rather than
+// leaving the shell half-patched.
 const SITE_TITLE = "cap2UI5 — Browser Playground";
 const SITE_DESCRIPTION = "Create UI5 apps purely in JavaScript";
-html = fs.readFileSync(indexFile, "utf8");
-if (/<title>[^<]*<\/title>/.test(html)) {
-  fs.writeFileSync(indexFile, html.replace(/<title>[^<]*<\/title>/, `<title>${SITE_TITLE}</title>`));
-}
+const indexFile = path.join(DIST, "index.html");
+fs.writeFileSync(
+  indexFile,
+  patchIndexHtml(fs.readFileSync(indexFile, "utf8"), { bundleName: BUNDLE_NAME, title: SITE_TITLE }),
+);
+
 const manifestFile = path.join(DIST, "manifest.json");
 if (fs.existsSync(manifestFile)) {
   try {
-    const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
-    if (manifest["sap.app"]?.title) manifest["sap.app"].title = SITE_TITLE;
-    if (manifest["sap.app"]?.description) manifest["sap.app"].description = SITE_DESCRIPTION;
-    fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
+    fs.writeFileSync(
+      manifestFile,
+      patchManifest(fs.readFileSync(manifestFile, "utf8"), { title: SITE_TITLE, description: SITE_DESCRIPTION }),
+    );
   } catch (e) {
     // A malformed manifest is the frontend's problem, not the title patch's.
     console.warn(`manifest.json: title not patched (${e.message})`);
   }
+}
+
+// ---- 5. samples.html --------------------------------------------------------
+// Without it the 100-odd bundled samples are reachable only by typing
+// ?app_start=<class name> — you have to already know the catalogue to use it.
+// Built from the registry (so only classes that actually shipped are listed)
+// and from the overview app's own catalogue table (so the titles match what
+// the running app shows).
+{
+  const shipped = registry.files
+    .filter((f) => f.startsWith(SAMPLES_DIR))
+    .map((f) => ({ app: path.basename(f, ".js"), repoPath: path.relative(CAP_DIR, f).split(path.sep).join("/") }));
+  const overview = path.join(SAMPLES_DIR, "z2ui5_cl_smp_app_000.js");
+  const catalog = fs.existsSync(overview) ? parseSampleCatalog(fs.readFileSync(overview, "utf8")) : new Map();
+  const entries = sampleEntries(shipped, catalog);
+  fs.writeFileSync(path.join(DIST, "samples.html"), renderSamplesPage(entries, { siteTitle: SITE_TITLE }));
+  const titled = entries.filter((e) => e.title !== e.app).length;
+  console.log(`web build: samples.html — ${entries.length} samples (${titled} with a catalogue title)`);
 }
 
 // GitHub Pages: serve folders starting with _ etc. as-is.
@@ -236,7 +255,8 @@ fs.writeFileSync(
 <body>
   <h1>Not found</h1>
   <p>That page is not part of the cap2UI5 playground.</p>
-  <p>Taking you <a href="./index.html">back to the app</a>&nbsp;…</p>
+  <p>Taking you <a href="./index.html">back to the app</a>&nbsp;… or browse
+  <a href="./samples.html">all samples</a>.</p>
 </body>
 </html>
 `,
@@ -273,34 +293,36 @@ if (fs.existsSync(licenseSrc)) fs.copyFileSync(licenseSrc, path.join(DIST, "LICE
 
 // BUILD_INFO.json — deployment marker served next to the site. CI's
 // post-deploy verification polls it on the live URL to detect when the
-// Pages deploy for a given upstream revision has actually gone live.
-// Deliberately deterministic (upstream sha only, no timestamps): identical
-// rebuilds must keep producing byte-identical sites so the publish step's
-// "no change — no deploy commit" property survives.
+// Pages deploy for a given upstream revision has actually gone live, and the
+// publish step compares it byte-for-byte to decide whether to deploy at all —
+// so everything in it must be a property of the inputs, never of the moment
+// the build ran (see build-info.mjs). registry_count and the auto-excluded
+// samples are recorded because they are what silently decides how much of the
+// deployed site can actually be run.
 const upstreamCommit = fs.readFileSync(path.join(CAP_DIR, "UPSTREAM_COMMIT"), "utf8").trim();
 fs.writeFileSync(
   path.join(DIST, "BUILD_INFO.json"),
-  JSON.stringify({ upstream_commit: upstreamCommit }, null, 2) + "\n",
+  buildInfoJson({
+    upstreamCommit,
+    registryCount: registry.count,
+    excludedSamples: [...excludeFiles].map((f) => path.relative(CAP_DIR, f).split(path.sep).join("/")),
+    // Unpinned bootstrap: this records which OpenUI5 a deploy actually got,
+    // so "the live site broke and nothing here changed" is answerable. It is
+    // the one value that can change without an input changing — which is a
+    // legitimate change signal, and never an error string when the CDN is
+    // simply unreachable.
+    openui5Version: await resolveOpenUI5Version(),
+  }),
 );
 
-// ---- 5. sanity-gate the shell ----------------------------------------------
+// ---- 6. sanity-gate the shell ----------------------------------------------
 // A broken bootstrap ships silently as a blank page (UI5 never loads), so
-// assert the invariants the static shell needs before we call the build good:
-//   - the in-browser backend bundle is injected and present on disk
-//   - UI5 boots from an OpenUI5 CDN over https — never the proprietary SAPUI5
-//     one (ui5.sap.com / *.hana.ondemand.com/sapui5), never a relative path
-//     (no server serves /resources on GitHub Pages)
+// assert the invariants the static shell needs before we call the build good.
+// The HTML side of the gate is shellProblems() in patch-index.mjs (tested
+// there); the file on disk can only be checked here.
 {
-  const finalHtml = fs.readFileSync(indexFile, "utf8");
-  const problems = [];
-  if (!finalHtml.includes(`src="./${BUNDLE_NAME}"`)) problems.push(`bundle <script src="./${BUNDLE_NAME}"> missing`);
+  const { bootSrc, problems } = shellProblems(fs.readFileSync(indexFile, "utf8"), BUNDLE_NAME);
   if (!fs.existsSync(path.join(DIST, BUNDLE_NAME))) problems.push(`${BUNDLE_NAME} not emitted`);
-  const boot = finalHtml.match(/id="sap-ui-bootstrap"[^>]*\ssrc="([^"]+)"/) || finalHtml.match(/<script[^>]*\ssrc="([^"]*sap-ui-core\.js)"/);
-  const bootSrc = boot?.[1] || "";
-  if (!bootSrc) problems.push("UI5 bootstrap <script src> not found");
-  else if (!/^https:\/\//.test(bootSrc)) problems.push(`UI5 bootstrap is not an absolute https URL: ${bootSrc}`);
-  else if (/ui5\.sap\.com|sapui5/i.test(bootSrc)) problems.push(`UI5 bootstrap uses the proprietary SAPUI5 distribution (OpenUI5 only): ${bootSrc}`);
-  else if (!/openui5/i.test(bootSrc)) problems.push(`UI5 bootstrap is not a recognized OpenUI5 CDN: ${bootSrc}`);
   if (problems.length) {
     throw new Error(`web build: shell sanity check failed —\n  - ${problems.join("\n  - ")}`);
   }

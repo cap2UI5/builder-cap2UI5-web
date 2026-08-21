@@ -140,7 +140,10 @@ export function serveDist() {
   const server = createServer((req, res) => {
     const urlPath = decodeURIComponent(req.url.split(/[?#]/)[0]);
     let file = path.normalize(path.join(DIST_DIR, urlPath));
-    if (!file.startsWith(DIST_DIR)) return res.writeHead(403).end();
+    // Separator-aware: a bare startsWith(DIST_DIR) also accepts a sibling
+    // "dist-x/" that ../ can escape into, so the traversal guard would let
+    // anything next to dist/ be served.
+    if (file !== DIST_DIR && !file.startsWith(DIST_DIR + path.sep)) return res.writeHead(403).end();
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
     if (!fs.existsSync(file)) return res.writeHead(404).end();
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });

@@ -30,7 +30,10 @@ what a visitor actually downloads — and the whole site ~1.1 MB, instead of
 ~12 MB.
 
 Start a specific app exactly like on the CAP server:
-`index.html?app_start=z2ui5_cl_smp_app_000`.
+`index.html?app_start=z2ui5_cl_smp_app_000`. `samples.html` lists every
+bundled sample with its title, deep-linked into the playground and linked to
+its sources — generated at build time from the same catalogue the in-app
+overview renders.
 
 ## How it works
 
@@ -111,7 +114,10 @@ npm run serve     # local test server on http://localhost:8080
 | `mirror.mjs` | shallow-clone (or copy) the upstream cap2UI5 repo → `input/cap2UI5/` |
 | `entry.mjs` | browser entry: register classes, plug draft store, patch fetch |
 | `gen-registry.mjs` | scans samples + built-ins → `generated/registry.mjs` (smoke-requires every candidate, skips broken ones — same policy as the upstream sync pipeline) |
-| `build.mjs` | esbuild bundle + webapp copy + index.html patch → `dist/` |
+| `build.mjs` | esbuild bundle + webapp copy + index.html patch + `samples.html` → `dist/` |
+| `patch-index.mjs` | the index.html/manifest substitutions as pure, unit-tested functions (+ the shell sanity gate) |
+| `samples-page.mjs` | generates `samples.html`, the landing page listing every bundled sample |
+| `build-info.mjs` | assembles the deterministic `BUILD_INFO.json` deployment marker |
 | `draft-store.mjs` | in-memory Map store (FIFO-bounded) |
 | `smoke.mjs` | headless-Chromium smoke suite against a served `dist/` (`npm run smoke`) |
 | `live-smoke.mjs` | same suite against the deployed Pages site (`npm run smoke:live`); used by the post-deploy verification in `build.yml` and the daily `health` workflow |
@@ -124,14 +130,18 @@ holds only the tooling; the built site itself lives in
 (its `main` branch, one commit per deployment) and is served from there via
 GitHub Pages.
 
-Two build details worth knowing:
+Three build details worth knowing:
 
 - **`keepNames: true` is load-bearing.** Draft serialization keys on
   `oApp.constructor.name`; without it, minification renames classes and
   drafts cannot be restored.
 - Samples that Node loads but esbuild's stricter scope analysis rejects
   (e.g. assignment to a `const`) are excluded from the registry
-  automatically and reported in the build log.
+  automatically and reported in the build log — and in `BUILD_INFO.json`,
+  next to the class count and the OpenUI5 version the bootstrap resolved to.
+- **A registry below 50 classes fails the build.** The class walk returns an
+  empty list for a directory that is not there, so a samples folder renamed
+  upstream would otherwise deploy a green, sample-less playground.
 
 ## Limitations
 

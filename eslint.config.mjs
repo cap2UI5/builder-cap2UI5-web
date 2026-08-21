@@ -12,9 +12,15 @@ const fetchGlobals = {
   Request: "readonly",
   Headers: "readonly",
   URL: "readonly",
+  AbortController: "readonly",
+  AbortSignal: "readonly",
 };
 
 const nodeGlobals = {
+  // fetch and AbortSignal are built into Node since 18 — build.mjs probes the
+  // OpenUI5 CDN for the version it records in BUILD_INFO.json.
+  fetch: "readonly",
+  AbortSignal: "readonly",
   process: "readonly",
   __dirname: "readonly",
   __filename: "readonly",
