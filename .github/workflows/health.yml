@@ -34,6 +34,7 @@ permissions:
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -59,6 +60,7 @@ jobs:
 
   freshness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: deployed site is built from a recent cap2UI5 commit
         run: |
@@ -99,6 +101,7 @@ jobs:
     needs: [live-smoke, freshness]
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       issues: write
     steps:
