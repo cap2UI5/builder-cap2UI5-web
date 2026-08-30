@@ -1,7 +1,11 @@
-// Browser stub for node:path — minimal posix implementation covering the
-// calls the framework makes (join/resolve/relative/basename/dirname). Paths
-// only feed fs lookups that always miss in the browser (see stubs/fs.cjs),
-// so string-level correctness is all that is needed.
+// Browser stub for node:path - a minimal posix implementation covering the
+// calls the framework makes. Paths only feed fs lookups that always miss in
+// the browser (see the fs stub), so string-level correctness is all that is
+// needed - but that correctness is load-bearing: a wrong join/relative
+// changes which module a require resolves to. Shared byte-identical between
+// builder-abap2UI5-js/adapters/web/shims/ (the source) and
+// builder-cap2UI5-web/stubs/ - see fs for why.
+"use strict";
 
 function normalize(p) {
   const isAbs = p.startsWith("/");
@@ -15,6 +19,8 @@ function normalize(p) {
     }
     out.push(seg);
   }
+  // never preserves a trailing slash (posix.normalize would) - harmless for
+  // the framework, whose normalized paths only feed basename/require lookups
   return (isAbs ? "/" : "") + out.join("/") || (isAbs ? "/" : ".");
 }
 
@@ -31,19 +37,6 @@ function resolve(...parts) {
   return normalize(resolved || "/");
 }
 
-function basename(p, ext) {
-  const base = p.split("/").filter(Boolean).pop() || "";
-  return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
-}
-
-function dirname(p) {
-  const norm = normalize(p);
-  const idx = norm.lastIndexOf("/");
-  if (idx < 0) return ".";
-  if (idx === 0) return "/";
-  return norm.slice(0, idx);
-}
-
 function relative(from, to) {
   const f = resolve(from).split("/").filter(Boolean);
   const t = resolve(to).split("/").filter(Boolean);
@@ -54,13 +47,33 @@ function relative(from, to) {
   return [...f.map(() => ".."), ...t].join("/") || ".";
 }
 
+function dirname(p) {
+  const norm = normalize(p);
+  const idx = norm.lastIndexOf("/");
+  if (idx < 0) return ".";
+  if (idx === 0) return "/";
+  return norm.slice(0, idx);
+}
+
+function basename(p, ext) {
+  const base = p.split("/").filter(Boolean).pop() || "";
+  return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
+}
+
+function extname(p) {
+  const base = normalize(p).split("/").pop() || "";
+  const idx = base.lastIndexOf(".");
+  return idx > 0 ? base.slice(idx) : "";
+}
+
 module.exports = {
+  sep: "/",
+  delimiter: ":",
+  normalize,
   join,
   resolve,
   relative,
-  basename,
   dirname,
-  normalize,
-  sep: "/",
-  delimiter: ":",
+  basename,
+  extname,
 };
