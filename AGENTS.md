@@ -43,7 +43,7 @@ framework **vendored at `core/`** (npm package `abap2UI5`):
 | `patch-index.mjs` | the index.html/manifest substitutions as pure functions (bundle injection, bootstrap → OpenUI5 CDN, title/description) plus the shell sanity gate — each throws when its anchor is gone instead of no-op'ing a blank deploy |
 | `samples-page.mjs` | `dist/samples.html`: the sample landing page, titles read from the overview app's own catalogue table, entries from the registry |
 | `build-info.mjs` | assembles `BUILD_INFO.json` (upstream sha, registry count, auto-excluded samples, resolved OpenUI5 version) — the file whose determinism the deploy step depends on |
-| `roundtrip.mjs` | the in-browser backend's request handling (endpoint matching, method/body/signal extraction, abort handling, error mapping, the fetch-interceptor install) — split out of `entry.mjs` so it is unit-testable without a browser | yes |
+| `roundtrip.mjs` | the in-browser backend's request handling (endpoint matching, method/body/signal extraction, abort handling, error mapping, the fetch-interceptor install) — split out of `entry.mjs` so it is unit-testable without a browser |
 | `entry.mjs` | browser entry: register classes, in-memory draft store, fetch interceptor for `*/rest/root/z2ui5` |
 | `stubs/` | build-time stand-ins for `@sap/cds`, `fs`, `path`, `crypto`, `async_hooks` |
 | `dev-server.mjs` | local static server (`npm run serve`, port 8080) |

@@ -21,8 +21,12 @@ const UPSTREAM = "https://github.com/cap2UI5/cap2UI5";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // The trigger_web workflow writes the exact upstream revision it wants built
-// into this repo's UPSTREAM_HEAD (via deploy key). A plain `git clone
-// --depth 1` ignores it and mirrors whatever HEAD GitHub happens to serve,
+// into this repo's UPSTREAM_HEAD (via deploy key). The same
+// honor-the-pin-only-when-newer arbitration exists a second time in
+// builder-cap2UI5/scripts/mirror-core.js (its trigger slot points at
+// builder-abap2UI5-js) - two implementations of one algorithm, kept in step
+// by hand; whoever changes the rule here carries it there too. A plain
+// `git clone --depth 1` ignores it and mirrors whatever HEAD GitHub happens to serve,
 // which — while replication lags the announced commit — can be an OLDER
 // revision, silently deploying a stale site. Read the pin so the clone can be
 // advanced to it (same arbitration as builder-cap2UI5:mirror-core.js).
